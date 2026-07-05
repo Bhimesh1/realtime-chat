@@ -91,6 +91,51 @@ export function useChat() {
     }
   }
 
+  function getMessageKey(message) {
+    return [
+      message.senderId,
+      message.receiverId,
+      message.sentAt,
+      message.data
+    ].join('|')
+  }
+
+  function mergeMessages(nextMessages) {
+    const mergedMessages = [...messages.value]
+    const existingKeys = new Set(mergedMessages.map(getMessageKey))
+
+    nextMessages.forEach(message => {
+      const messageKey = getMessageKey(message)
+
+      if (!existingKeys.has(messageKey)) {
+        mergedMessages.push(message)
+        existingKeys.add(messageKey)
+      }
+    })
+
+    messages.value = mergedMessages.sort((first, second) =>
+      new Date(first.sentAt) - new Date(second.sentAt)
+    )
+  }
+
+  async function loadHistory(nextReceiverId) {
+    if (!connection || connectionStatus.value !== 'Connected') {
+      return
+    }
+
+    if (!nextReceiverId.trim()) {
+      return
+    }
+
+    try {
+      const history = await connection.invoke('GetHistory', nextReceiverId.trim())
+      mergeMessages(history)
+    } catch (error) {
+      console.error(error)
+      errorMessage.value = 'Could not load message history.'
+    }
+  }
+
   async function sendTypingStatus(status) {
     if (!connection || connectionStatus.value !== 'Connected') {
       return
@@ -112,9 +157,9 @@ export function useChat() {
     }
   }
 
-  function selectReceiver(nextReceiverId) {
+  async function selectReceiver(nextReceiverId) {
     if (receiverId.value && receiverId.value !== nextReceiverId) {
-      void sendTypingStatus('stop')
+      await sendTypingStatus('stop')
     }
 
     clearOutgoingTypingTimer()
@@ -127,11 +172,13 @@ export function useChat() {
         ...unreadByUser.value,
         [nextReceiverId]: 0
       }
+
+      await loadHistory(nextReceiverId)
     }
   }
 
   function addMessage(message) {
-    messages.value = [...messages.value, message]
+    mergeMessages([message])
 
     const isIncomingMessage = message.senderId !== currentUserId.value
     const isInactiveConversation = message.senderId !== receiverId.value
@@ -168,7 +215,7 @@ export function useChat() {
           onlineUsers.value = onlineUsers.value.filter(user => user !== changedUserId)
 
           if (receiverId.value === changedUserId) {
-            selectReceiver('')
+            void selectReceiver('')
           }
         }
       })
@@ -218,6 +265,10 @@ export function useChat() {
           receiverId: '',
           data: ''
         })
+
+        if (receiverId.value) {
+          await loadHistory(receiverId.value)
+        }
       })
 
       connection.onclose(() => {
@@ -263,7 +314,7 @@ export function useChat() {
       onlineUsers.value = []
       clearOutgoingTypingTimer()
       clearIncomingTypingIndicator()
-      selectReceiver('')
+      void selectReceiver('')
     }
   }
 

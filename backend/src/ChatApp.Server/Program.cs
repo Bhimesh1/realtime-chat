@@ -17,6 +17,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<MessageValidator>();
+builder.Services.AddSingleton<MessageStore>();
 
 var app = builder.Build();
 

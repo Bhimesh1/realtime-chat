@@ -37,10 +37,16 @@ public class ChatHub : Hub
 
         var senderId = message.SenderId.Trim();
 
+        if (ConnectedUsers.TryGetValue(senderId, out var existingConnectionId) &&
+            existingConnectionId != Context.ConnectionId)
+        {
+            throw new HubException("This username is already in use.");
+        }
+
         RemoveExistingUserForCurrentConnection();
 
         ConnectedUsers[senderId] = Context.ConnectionId;
-
+        
         await Clients.All.SendAsync("UserPresenceChanged", senderId, true);
         await Clients.Caller.SendAsync("OnlineUsers", ConnectedUsers.Keys.Order().ToList());
     }

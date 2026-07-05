@@ -191,6 +191,16 @@ export function useChat() {
     }
   }
 
+  function getConnectionErrorMessage(error) {
+    const message = error instanceof Error ? error.message : ''
+
+    if (message.includes('This username is already in use.')) {
+      return 'This username is already in use.'
+    }
+
+    return 'Could not connect to chat server.'
+  }
+
   async function connectUser() {
     errorMessage.value = ''
 
@@ -289,8 +299,18 @@ export function useChat() {
 
       connectionStatus.value = 'Connected'
     } catch (error) {
+      if (connection) {
+        try {
+          await connection.stop()
+        } catch (stopError) {
+          console.error(stopError)
+        }
+      }
+
+      connection = null
       connectionStatus.value = 'Disconnected'
-      errorMessage.value = 'Could not connect to chat server.'
+      onlineUsers.value = []
+      errorMessage.value = getConnectionErrorMessage(error)
       console.error(error)
     }
   }

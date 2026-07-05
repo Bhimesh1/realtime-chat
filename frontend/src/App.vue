@@ -1,6 +1,9 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { createChatConnection } from './services/chatConnection'
+import LoginPanel from './components/LoginPanel.vue'
+import UserSidebar from './components/UserSidebar.vue'
+import ChatPanel from './components/ChatPanel.vue'
 
 const userId = ref('')
 const receiverId = ref('')
@@ -104,7 +107,6 @@ async function connectUser() {
   }
 }
 
-
 async function disconnectUser() {
   errorMessage.value = ''
 
@@ -125,8 +127,6 @@ async function disconnectUser() {
     typingIndicator.value = ''
   }
 }
-
-
 
 async function sendMessage() {
   errorMessage.value = ''
@@ -181,138 +181,41 @@ async function sendTyping() {
     console.error(error)
   }
 }
-
-function formatTime(sentAt) {
-  return new Date(sentAt).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
 </script>
 
 <template>
   <main class="page">
     <section class="chat-shell">
       <aside class="sidebar">
-        <h1>Real-Time Chat</h1>
-        <p class="subtitle">ASP.NET Core SignalR with Vue.</p>
+        <LoginPanel
+          :user-id="userId"
+          :connection-status="connectionStatus"
+          @update:user-id="userId = $event"
+          @connect="connectUser"
+          @disconnect="disconnectUser"
+        />
 
-        <div class="connect-box">
-          <label for="userId">Your user id</label>
-          <div class="form-row">
-            <input
-              id="userId"
-              v-model="userId"
-              type="text"
-              placeholder="user-1"
-              :disabled="connectionStatus === 'Connected'"
-            />
-
-            <button
-              v-if="connectionStatus !== 'Connected'"
-              type="button"
-              @click="connectUser"
-            >
-              Connect
-            </button>
-
-            <button
-              v-else
-              type="button"
-              class="secondary-button"
-              @click="disconnectUser"
-            >
-              Disconnect
-            </button>
-          </div>
-        </div>
-
-        <p class="status">
-          Status: <strong>{{ connectionStatus }}</strong>
-        </p>
-
-        <section class="online-users">
-          <h2>Online users</h2>
-
-          <p v-if="onlineUsers.length === 0" class="empty-text">
-            No users online yet.
-          </p>
-
-          <ul v-else>
-            <li v-for="user in onlineUsers" :key="user">
-              <span class="presence-dot"></span>
-              {{ user }}
-            </li>
-          </ul>
-        </section>
+        <UserSidebar :online-users="onlineUsers" />
       </aside>
 
-      <section class="chat-panel">
-        <div class="chat-header">
-          <div>
-            <h2>Messages</h2>
-            <p>Send a message to another connected user.</p>
-          </div>
-
-          <select v-model="receiverId">
-            <option value="">Select receiver</option>
-            <option
-              v-for="receiver in availableReceivers"
-              :key="receiver"
-              :value="receiver"
-            >
-              {{ receiver }}
-            </option>
-          </select>
-        </div>
-
-        <p v-if="errorMessage" class="error">
-          {{ errorMessage }}
-        </p>
-
-        <p v-if="typingIndicator" class="typing-indicator">
-          {{ typingIndicator }}
-        </p>
-
-        <div class="message-list">
-          <p v-if="messages.length === 0" class="empty-text">
-            No messages yet.
-          </p>
-
-          <article
-            v-for="message in messages"
-            :key="`${message.senderId}-${message.receiverId}-${message.sentAt}-${message.data}`"
-            class="message"
-            :class="{ own: message.senderId === userId.trim() }"
-          >
-            <div class="message-meta">
-              <strong>{{ message.senderId }}</strong>
-              <span>to {{ message.receiverId }}</span>
-              <span>{{ formatTime(message.sentAt) }}</span>
-            </div>
-
-            <p>{{ message.data }}</p>
-          </article>
-        </div>
-
-        <form class="message-form" @submit.prevent="sendMessage">
-          <input
-            v-model="messageText"
-            type="text"
-            placeholder="Type your message"
-            @input="sendTyping"
-          />
-
-          <button type="submit">
-            Send
-          </button>
-        </form>
-      </section>
+      <ChatPanel
+        :receiver-id="receiverId"
+        :available-receivers="availableReceivers"
+        :error-message="errorMessage"
+        :typing-indicator="typingIndicator"
+        :messages="messages"
+        :user-id="userId"
+        :message-text="messageText"
+        @update:receiver-id="receiverId = $event"
+        @update:message-text="messageText = $event"
+        @send-message="sendMessage"
+        @send-typing="sendTyping"
+      />
     </section>
   </main>
 </template>
 
-<style scoped>
+<style>
 .page {
   min-height: 100vh;
   display: grid;
@@ -458,6 +361,13 @@ input:disabled {
   color: #991b1b;
 }
 
+.typing-indicator {
+  margin: 14px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  font-style: italic;
+}
+
 .message-list {
   flex: 1;
   display: flex;
@@ -518,18 +428,5 @@ input:disabled {
   .chat-header select {
     max-width: none;
   }
-
-  .typing-indicator {
-  margin: 14px 0 0;
-  color: #64748b;
-  font-size: 14px;
-  font-style: italic;
-  }
-
 }
 </style>
-
-
-
-
-

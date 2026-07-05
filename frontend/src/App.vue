@@ -9,11 +9,12 @@ const {
   receiverId,
   messageText,
   connectionStatus,
-  onlineUsers,
-  messages,
+  visibleMessages,
   errorMessage,
   typingIndicator,
   availableReceivers,
+  conversationPreviews,
+  selectReceiver,
   connectUser,
   disconnectUser,
   sendMessage,
@@ -33,7 +34,11 @@ const {
           @disconnect="disconnectUser"
         />
 
-        <UserSidebar :online-users="onlineUsers" />
+        <UserSidebar
+          :conversations="conversationPreviews"
+          :selected-receiver-id="receiverId"
+          @select-user="selectReceiver"
+        />
       </aside>
 
       <ChatPanel
@@ -41,10 +46,10 @@ const {
         :available-receivers="availableReceivers"
         :error-message="errorMessage"
         :typing-indicator="typingIndicator"
-        :messages="messages"
+        :messages="visibleMessages"
         :user-id="userId"
         :message-text="messageText"
-        @update:receiver-id="receiverId = $event"
+        @select-receiver="selectReceiver"
         @update:message-text="messageText = $event"
         @send-message="sendMessage"
         @send-typing="sendTyping"
@@ -150,11 +155,52 @@ input:disabled {
   list-style: none;
 }
 
-.online-users li {
+.conversation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.conversation-item {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  padding: 8px 0;
+  padding: 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.conversation-item:hover,
+.conversation-item.active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.conversation-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.conversation-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.conversation-text strong {
+  color: white;
+}
+
+.conversation-text span {
+  max-width: 180px;
+  overflow: hidden;
+  color: #cbd5e1;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .presence-dot {
@@ -162,6 +208,21 @@ input:disabled {
   height: 9px;
   border-radius: 999px;
   background: #22c55e;
+}
+
+.presence-dot.offline {
+  background: #64748b;
+}
+
+.unread-badge {
+  min-width: 22px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
 }
 
 .chat-panel {

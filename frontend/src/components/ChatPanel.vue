@@ -31,14 +31,14 @@ defineProps({
 })
 
 const emit = defineEmits([
-  'update:receiverId',
+  'select-receiver',
   'update:messageText',
   'send-message',
   'send-typing'
 ])
 
 function updateReceiver(event) {
-  emit('update:receiverId', event.target.value)
+  emit('select-receiver', event.target.value)
 }
 
 function updateMessageText(event) {
@@ -58,8 +58,10 @@ function formatTime(sentAt) {
   <section class="chat-panel">
     <div class="chat-header">
       <div>
-        <h2>Messages</h2>
-        <p>Send a message to another connected user.</p>
+        <h2>{{ receiverId || 'Messages' }}</h2>
+        <p>
+          {{ receiverId ? 'Send a message to this user.' : 'Select a conversation to start chatting.' }}
+        </p>
       </div>
 
       <select :value="receiverId" @change="updateReceiver">
@@ -84,7 +86,7 @@ function formatTime(sentAt) {
 
     <div class="message-list">
       <p v-if="messages.length === 0" class="empty-text">
-        No messages yet.
+        {{ receiverId ? 'No messages in this conversation yet.' : 'Choose a receiver to view messages.' }}
       </p>
 
       <article
@@ -108,10 +110,11 @@ function formatTime(sentAt) {
         :value="messageText"
         type="text"
         placeholder="Type your message"
+        :disabled="!receiverId"
         @input="updateMessageText"
       />
 
-      <button type="submit">
+      <button type="submit" :disabled="!receiverId">
         Send
       </button>
     </form>

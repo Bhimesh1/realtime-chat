@@ -10,18 +10,100 @@ export function useChat() {
   const messages = ref([])
   const errorMessage = ref('')
   const typingIndicator = ref('')
+  const unreadByUser = ref({})
 
   let typingTimeout = null
   let connection = null
 
+  const currentUserId = computed(() => userId.value.trim())
+
   const availableReceivers = computed(() =>
-    onlineUsers.value.filter(user => user !== userId.value.trim())
+    onlineUsers.value.filter(user => user !== currentUserId.value)
   )
+
+  const visibleMessages = computed(() => {
+    if (!receiverId.value.trim()) {
+      return messages.value
+    }
+
+    return messages.value.filter(message =>
+      (message.senderId === currentUserId.value && message.receiverId === receiverId.value) ||
+      (message.senderId === receiverId.value && message.receiverId === currentUserId.value)
+    )
+  })
+
+  const conversationPreviews = computed(() => {
+    const peers = new Set(availableReceivers.value)
+
+    messages.value.forEach(message => {
+      const peerId = message.senderId === currentUserId.value
+        ? message.receiverId
+        : message.senderId
+
+      if (peerId && peerId !== currentUserId.value) {
+        peers.add(peerId)
+      }
+    })
+
+    return [...peers].sort().map(peerId => {
+      const conversationMessages = messages.value.filter(message =>
+        (message.senderId === currentUserId.value && message.receiverId === peerId) ||
+        (message.senderId === peerId && message.receiverId === currentUserId.value)
+      )
+
+      const lastMessage = conversationMessages.at(-1)
+      const isOnline = onlineUsers.value.includes(peerId)
+      const unreadCount = unreadByUser.value[peerId] || 0
+
+      return {
+        userId: peerId,
+        isOnline,
+        unreadCount,
+        lastMessage,
+        preview: getPreviewText(lastMessage)
+      }
+    })
+  })
+
+  function getPreviewText(message) {
+    if (!message) {
+      return 'No messages yet'
+    }
+
+    const prefix = message.senderId === currentUserId.value ? 'You: ' : ''
+    return `${prefix}${message.data}`
+  }
+
+  function selectReceiver(nextReceiverId) {
+    receiverId.value = nextReceiverId
+    typingIndicator.value = ''
+
+    if (nextReceiverId) {
+      unreadByUser.value = {
+        ...unreadByUser.value,
+        [nextReceiverId]: 0
+      }
+    }
+  }
+
+  function addMessage(message) {
+    messages.value = [...messages.value, message]
+
+    const isIncomingMessage = message.senderId !== currentUserId.value
+    const isInactiveConversation = message.senderId !== receiverId.value
+
+    if (isIncomingMessage && isInactiveConversation) {
+      unreadByUser.value = {
+        ...unreadByUser.value,
+        [message.senderId]: (unreadByUser.value[message.senderId] || 0) + 1
+      }
+    }
+  }
 
   async function connectUser() {
     errorMessage.value = ''
 
-    if (!userId.value.trim()) {
+    if (!currentUserId.value) {
       errorMessage.value = 'Enter a user id before connecting.'
       return
     }
@@ -42,16 +124,20 @@ export function useChat() {
           onlineUsers.value = onlineUsers.value.filter(user => user !== changedUserId)
 
           if (receiverId.value === changedUserId) {
-            receiverId.value = ''
+            selectReceiver('')
           }
         }
       })
 
       connection.on('ReceiveMessage', message => {
-        messages.value = [...messages.value, message]
+        addMessage(message)
       })
 
       connection.on('ReceiveTyping', message => {
+        if (message.senderId !== receiverId.value) {
+          return
+        }
+
         typingIndicator.value = `${message.senderId} is typing...`
 
         if (typingTimeout) {
@@ -76,7 +162,7 @@ export function useChat() {
 
         await connection.invoke('RegisterUser', {
           type: 'connect',
-          senderId: userId.value.trim(),
+          senderId: currentUserId.value,
           receiverId: '',
           data: ''
         })
@@ -91,7 +177,7 @@ export function useChat() {
 
       await connection.invoke('RegisterUser', {
         type: 'connect',
-        senderId: userId.value.trim(),
+        senderId: currentUserId.value,
         receiverId: '',
         data: ''
       })
@@ -120,8 +206,7 @@ export function useChat() {
       connection = null
       connectionStatus.value = 'Disconnected'
       onlineUsers.value = []
-      receiverId.value = ''
-      typingIndicator.value = ''
+      selectReceiver('')
     }
   }
 
@@ -134,7 +219,7 @@ export function useChat() {
     }
 
     if (!receiverId.value.trim()) {
-      errorMessage.value = 'Enter a receiver id.'
+      errorMessage.value = 'Select a receiver.'
       return
     }
 
@@ -146,7 +231,7 @@ export function useChat() {
     try {
       await connection.invoke('SendMessage', {
         type: 'chat',
-        senderId: userId.value.trim(),
+        senderId: currentUserId.value,
         receiverId: receiverId.value.trim(),
         data: messageText.value.trim()
       })
@@ -170,7 +255,7 @@ export function useChat() {
     try {
       await connection.invoke('SendTyping', {
         type: 'typing',
-        senderId: userId.value.trim(),
+        senderId: currentUserId.value,
         receiverId: receiverId.value.trim(),
         data: 'typing'
       })
@@ -186,9 +271,12 @@ export function useChat() {
     connectionStatus,
     onlineUsers,
     messages,
+    visibleMessages,
     errorMessage,
     typingIndicator,
     availableReceivers,
+    conversationPreviews,
+    selectReceiver,
     connectUser,
     disconnectUser,
     sendMessage,

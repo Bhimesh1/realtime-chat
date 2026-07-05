@@ -1,318 +1,64 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { createChatConnection } from './services/chatConnection'
+import LoginPanel from './components/LoginPanel.vue'
+import UserSidebar from './components/UserSidebar.vue'
+import ChatPanel from './components/ChatPanel.vue'
+import { useChat } from './composables/useChat'
 
-const userId = ref('')
-const receiverId = ref('')
-const messageText = ref('')
-const connectionStatus = ref('Disconnected')
-const onlineUsers = ref([])
-const messages = ref([])
-const errorMessage = ref('')
-const typingIndicator = ref('')
-
-let typingTimeout = null
-let connection = null
-
-const availableReceivers = computed(() =>
-  onlineUsers.value.filter(user => user !== userId.value.trim())
-)
-
-async function connectUser() {
-  errorMessage.value = ''
-
-  if (!userId.value.trim()) {
-    errorMessage.value = 'Enter a user id before connecting.'
-    return
-  }
-
-  try {
-    connection = createChatConnection()
-
-    connection.on('OnlineUsers', users => {
-      onlineUsers.value = users
-    })
-
-    connection.on('UserPresenceChanged', (changedUserId, isOnline) => {
-      if (isOnline && !onlineUsers.value.includes(changedUserId)) {
-        onlineUsers.value = [...onlineUsers.value, changedUserId].sort()
-      }
-
-      if (!isOnline) {
-        onlineUsers.value = onlineUsers.value.filter(user => user !== changedUserId)
-
-        if (receiverId.value === changedUserId) {
-          receiverId.value = ''
-        }
-      }
-    })
-
-    connection.on('ReceiveMessage', message => {
-      messages.value = [...messages.value, message]
-    })
-
-    connection.on('ReceiveTyping', message => {
-      typingIndicator.value = `${message.senderId} is typing...`
-
-      if (typingTimeout) {
-        clearTimeout(typingTimeout)
-      }
-
-      typingTimeout = setTimeout(() => {
-        typingIndicator.value = ''
-      }, 1500)
-    })
-
-    connection.on('ReceiveError', error => {
-      errorMessage.value = error.data
-    })
-
-    connection.onreconnecting(() => {
-      connectionStatus.value = 'Reconnecting'
-    })
-
-    connection.onreconnected(async () => {
-      connectionStatus.value = 'Connected'
-
-      await connection.invoke('RegisterUser', {
-        type: 'connect',
-        senderId: userId.value.trim(),
-        receiverId: '',
-        data: ''
-      })
-    })
-
-    connection.onclose(() => {
-      connectionStatus.value = 'Disconnected'
-      onlineUsers.value = []
-    })
-
-    await connection.start()
-
-    await connection.invoke('RegisterUser', {
-      type: 'connect',
-      senderId: userId.value.trim(),
-      receiverId: '',
-      data: ''
-    })
-
-    connectionStatus.value = 'Connected'
-  } catch (error) {
-    connectionStatus.value = 'Disconnected'
-    errorMessage.value = 'Could not connect to chat server.'
-    console.error(error)
-  }
-}
-
-
-async function disconnectUser() {
-  errorMessage.value = ''
-
-  if (!connection) {
-    return
-  }
-
-  try {
-    await connection.stop()
-  } catch (error) {
-    errorMessage.value = 'Could not disconnect cleanly.'
-    console.error(error)
-  } finally {
-    connection = null
-    connectionStatus.value = 'Disconnected'
-    onlineUsers.value = []
-    receiverId.value = ''
-    typingIndicator.value = ''
-  }
-}
-
-
-
-async function sendMessage() {
-  errorMessage.value = ''
-
-  if (!connection || connectionStatus.value !== 'Connected') {
-    errorMessage.value = 'Connect before sending a message.'
-    return
-  }
-
-  if (!receiverId.value.trim()) {
-    errorMessage.value = 'Enter a receiver id.'
-    return
-  }
-
-  if (!messageText.value.trim()) {
-    errorMessage.value = 'Enter a message.'
-    return
-  }
-
-  try {
-    await connection.invoke('SendMessage', {
-      type: 'chat',
-      senderId: userId.value.trim(),
-      receiverId: receiverId.value.trim(),
-      data: messageText.value.trim()
-    })
-
-    messageText.value = ''
-  } catch (error) {
-    errorMessage.value = 'Message could not be sent.'
-    console.error(error)
-  }
-}
-
-async function sendTyping() {
-  if (!connection || connectionStatus.value !== 'Connected') {
-    return
-  }
-
-  if (!receiverId.value.trim()) {
-    return
-  }
-
-  try {
-    await connection.invoke('SendTyping', {
-      type: 'typing',
-      senderId: userId.value.trim(),
-      receiverId: receiverId.value.trim(),
-      data: 'typing'
-    })
-  } catch (error) {
-    console.error(error)
-  }
-}
-
-function formatTime(sentAt) {
-  return new Date(sentAt).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
+const {
+  userId,
+  receiverId,
+  messageText,
+  connectionStatus,
+  visibleMessages,
+  errorMessage,
+  typingIndicator,
+  availableReceivers,
+  conversationPreviews,
+  selectReceiver,
+  connectUser,
+  disconnectUser,
+  sendMessage,
+  sendTyping
+} = useChat()
 </script>
 
 <template>
   <main class="page">
     <section class="chat-shell">
       <aside class="sidebar">
-        <h1>Real-Time Chat</h1>
-        <p class="subtitle">ASP.NET Core SignalR with Vue.</p>
+        <LoginPanel
+          :user-id="userId"
+          :connection-status="connectionStatus"
+          @update:user-id="userId = $event"
+          @connect="connectUser"
+          @disconnect="disconnectUser"
+        />
 
-        <div class="connect-box">
-          <label for="userId">Your user id</label>
-          <div class="form-row">
-            <input
-              id="userId"
-              v-model="userId"
-              type="text"
-              placeholder="user-1"
-              :disabled="connectionStatus === 'Connected'"
-            />
-
-            <button
-              v-if="connectionStatus !== 'Connected'"
-              type="button"
-              @click="connectUser"
-            >
-              Connect
-            </button>
-
-            <button
-              v-else
-              type="button"
-              class="secondary-button"
-              @click="disconnectUser"
-            >
-              Disconnect
-            </button>
-          </div>
-        </div>
-
-        <p class="status">
-          Status: <strong>{{ connectionStatus }}</strong>
-        </p>
-
-        <section class="online-users">
-          <h2>Online users</h2>
-
-          <p v-if="onlineUsers.length === 0" class="empty-text">
-            No users online yet.
-          </p>
-
-          <ul v-else>
-            <li v-for="user in onlineUsers" :key="user">
-              <span class="presence-dot"></span>
-              {{ user }}
-            </li>
-          </ul>
-        </section>
+        <UserSidebar
+          :conversations="conversationPreviews"
+          :selected-receiver-id="receiverId"
+          @select-user="selectReceiver"
+        />
       </aside>
 
-      <section class="chat-panel">
-        <div class="chat-header">
-          <div>
-            <h2>Messages</h2>
-            <p>Send a message to another connected user.</p>
-          </div>
-
-          <select v-model="receiverId">
-            <option value="">Select receiver</option>
-            <option
-              v-for="receiver in availableReceivers"
-              :key="receiver"
-              :value="receiver"
-            >
-              {{ receiver }}
-            </option>
-          </select>
-        </div>
-
-        <p v-if="errorMessage" class="error">
-          {{ errorMessage }}
-        </p>
-
-        <p v-if="typingIndicator" class="typing-indicator">
-          {{ typingIndicator }}
-        </p>
-
-        <div class="message-list">
-          <p v-if="messages.length === 0" class="empty-text">
-            No messages yet.
-          </p>
-
-          <article
-            v-for="message in messages"
-            :key="`${message.senderId}-${message.receiverId}-${message.sentAt}-${message.data}`"
-            class="message"
-            :class="{ own: message.senderId === userId.trim() }"
-          >
-            <div class="message-meta">
-              <strong>{{ message.senderId }}</strong>
-              <span>to {{ message.receiverId }}</span>
-              <span>{{ formatTime(message.sentAt) }}</span>
-            </div>
-
-            <p>{{ message.data }}</p>
-          </article>
-        </div>
-
-        <form class="message-form" @submit.prevent="sendMessage">
-          <input
-            v-model="messageText"
-            type="text"
-            placeholder="Type your message"
-            @input="sendTyping"
-          />
-
-          <button type="submit">
-            Send
-          </button>
-        </form>
-      </section>
+      <ChatPanel
+        :receiver-id="receiverId"
+        :available-receivers="availableReceivers"
+        :error-message="errorMessage"
+        :typing-indicator="typingIndicator"
+        :messages="visibleMessages"
+        :user-id="userId"
+        :message-text="messageText"
+        @select-receiver="selectReceiver"
+        @update:message-text="messageText = $event"
+        @send-message="sendMessage"
+        @send-typing="sendTyping"
+      />
     </section>
   </main>
 </template>
 
-<style scoped>
+<style>
 .page {
   min-height: 100vh;
   display: grid;
@@ -409,11 +155,52 @@ input:disabled {
   list-style: none;
 }
 
-.online-users li {
+.conversation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.conversation-item {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  padding: 8px 0;
+  padding: 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.conversation-item:hover,
+.conversation-item.active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.conversation-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.conversation-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.conversation-text strong {
+  color: white;
+}
+
+.conversation-text span {
+  max-width: 180px;
+  overflow: hidden;
+  color: #cbd5e1;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .presence-dot {
@@ -421,6 +208,21 @@ input:disabled {
   height: 9px;
   border-radius: 999px;
   background: #22c55e;
+}
+
+.presence-dot.offline {
+  background: #64748b;
+}
+
+.unread-badge {
+  min-width: 22px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
 }
 
 .chat-panel {
@@ -456,6 +258,13 @@ input:disabled {
   border-radius: 10px;
   background: #fee2e2;
   color: #991b1b;
+}
+
+.typing-indicator {
+  margin: 14px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  font-style: italic;
 }
 
 .message-list {
@@ -518,18 +327,5 @@ input:disabled {
   .chat-header select {
     max-width: none;
   }
-
-  .typing-indicator {
-  margin: 14px 0 0;
-  color: #64748b;
-  font-size: 14px;
-  font-style: italic;
-  }
-
 }
 </style>
-
-
-
-
-

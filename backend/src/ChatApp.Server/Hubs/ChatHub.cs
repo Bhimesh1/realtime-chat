@@ -11,11 +11,13 @@ public class ChatHub : Hub
         StringComparer.OrdinalIgnoreCase);
 
     private readonly MessageValidator _messageValidator;
+    private readonly MessageStore _messageStore;
 
-    public ChatHub(MessageValidator messageValidator)
-    {
-        _messageValidator = messageValidator;
-    }
+    public ChatHub(MessageValidator messageValidator, MessageStore messageStore)
+{
+    _messageValidator = messageValidator;
+    _messageStore = messageStore;
+}
 
     public async Task RegisterUser(ChatMessage message)
     {
@@ -73,8 +75,34 @@ public class ChatHub : Hub
             return;
         }
 
+        _messageStore.Add(message);
+
         await Clients.Client(receiverConnectionId).SendAsync("ReceiveMessage", message);
         await Clients.Caller.SendAsync("ReceiveMessage", message);
+    }
+
+    public Task<IReadOnlyList<ChatMessage>> GetHistory(string receiverId)
+    {
+        if (string.IsNullOrWhiteSpace(receiverId))
+        {
+            return Task.FromResult<IReadOnlyList<ChatMessage>>(Array.Empty<ChatMessage>());
+        }
+
+        var senderId = GetCurrentRegisteredUserId();
+
+        if (string.IsNullOrWhiteSpace(senderId))
+        {
+            return Task.FromResult<IReadOnlyList<ChatMessage>>(Array.Empty<ChatMessage>());
+        }
+
+        if (senderId.Equals(receiverId, StringComparison.OrdinalIgnoreCase))
+        {
+            return Task.FromResult<IReadOnlyList<ChatMessage>>(Array.Empty<ChatMessage>());
+        }
+
+        var history = _messageStore.GetConversation(senderId, receiverId);
+
+        return Task.FromResult(history);
     }
 
     public async Task SendTyping(ChatMessage message)
@@ -134,6 +162,14 @@ public class ChatHub : Hub
         {
             ConnectedUsers.TryRemove(existingUser.Key, out _);
         }
+    }
+
+    private string GetCurrentRegisteredUserId()
+    {
+        var registeredUser = ConnectedUsers.FirstOrDefault(user =>
+            user.Value == Context.ConnectionId);
+
+        return registeredUser.Key ?? string.Empty;
     }
 
     private Task SendError(string errorMessage)

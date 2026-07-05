@@ -23,309 +23,83 @@ const {
 </script>
 
 <template>
-  <main class="page">
-    <section class="chat-shell">
-      <aside class="sidebar">
-        <LoginPanel
-          :user-id="userId"
-          :connection-status="connectionStatus"
-          @update:user-id="userId = $event"
-          @connect="connectUser"
-          @disconnect="disconnectUser"
-        />
+  <LoginPanel
+    v-if="connectionStatus === 'Disconnected'"
+    :user-id="userId"
+    :connection-status="connectionStatus"
+    :error-message="errorMessage"
+    @update:user-id="userId = $event"
+    @connect="connectUser"
+  />
 
-        <UserSidebar
-          :conversations="conversationPreviews"
-          :selected-receiver-id="receiverId"
-          @select-user="selectReceiver"
-        />
-      </aside>
+  <main v-else class="layout">
+    <div v-if="connectionStatus === 'Reconnecting'" class="banner reconnecting">
+      Connection lost — reconnecting…
+    </div>
+
+    <div v-if="errorMessage" class="banner error">
+      {{ errorMessage }}
+    </div>
+
+    <div class="main">
+      <UserSidebar
+        :user-id="userId"
+        :conversations="conversationPreviews"
+        :selected-receiver-id="receiverId"
+        @select-user="selectReceiver"
+        @disconnect="disconnectUser"
+      />
 
       <ChatPanel
         :receiver-id="receiverId"
         :available-receivers="availableReceivers"
-        :error-message="errorMessage"
         :typing-indicator="typingIndicator"
         :messages="visibleMessages"
         :user-id="userId"
         :message-text="messageText"
+        :connection-status="connectionStatus"
         @select-receiver="selectReceiver"
         @update:message-text="messageText = $event"
         @send-message="sendMessage"
         @send-typing="sendTyping"
       />
-    </section>
+    </div>
   </main>
 </template>
 
-<style>
-.page {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  background: #f3f4f6;
-  font-family: Arial, sans-serif;
-}
-
-.chat-shell {
-  width: min(1000px, 94vw);
-  min-height: 620px;
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  overflow: hidden;
-  border-radius: 18px;
-  background: white;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
-}
-
-.sidebar {
-  padding: 24px;
-  background: #0f172a;
-  color: white;
-}
-
-.sidebar h1 {
-  margin: 0;
-  font-size: 28px;
-}
-
-.subtitle {
-  margin-top: 8px;
-  color: #cbd5e1;
-}
-
-.connect-box {
-  margin-top: 28px;
-}
-
-label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 700;
-}
-
-.form-row {
-  display: flex;
-  gap: 10px;
-}
-
-input,
-select {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
-  font-size: 15px;
-}
-
-button {
-  padding: 12px 18px;
-  border: 0;
-  border-radius: 10px;
-  background: #2563eb;
-  color: white;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-button:disabled,
-input:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
-.secondary-button {
-  background: #475569;
-}
-
-.status {
-  margin-top: 18px;
-}
-
-.online-users {
-  margin-top: 28px;
-}
-
-.online-users h2 {
-  font-size: 18px;
-}
-
-.online-users ul {
-  padding: 0;
-  list-style: none;
-}
-
-.conversation-list {
+<style scoped>
+.layout {
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 
-.conversation-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.conversation-item:hover,
-.conversation-item.active {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.conversation-main {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.conversation-text {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.conversation-text strong {
-  color: white;
-}
-
-.conversation-text span {
-  max-width: 180px;
-  overflow: hidden;
-  color: #cbd5e1;
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.presence-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: #22c55e;
-}
-
-.presence-dot.offline {
-  background: #64748b;
-}
-
-.unread-badge {
-  min-width: 22px;
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: #2563eb;
-  color: white;
-  font-size: 12px;
-  font-weight: 700;
+.banner {
+  padding: 8px 16px;
   text-align: center;
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.chat-panel {
-  display: flex;
-  flex-direction: column;
-  min-height: 620px;
-  padding: 24px;
+.banner.reconnecting {
+  background: #4a3b12;
+  color: #ffd166;
 }
 
-.chat-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+.banner.error {
+  background: #451820;
+  color: var(--red);
 }
 
-.chat-header h2 {
-  margin: 0;
-}
-
-.chat-header p {
-  margin: 6px 0 0;
-  color: #64748b;
-}
-
-.chat-header select {
-  max-width: 220px;
-}
-
-.error {
-  margin-top: 16px;
-  padding: 12px;
-  border-radius: 10px;
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.typing-indicator {
-  margin: 14px 0 0;
-  color: #64748b;
-  font-size: 14px;
-  font-style: italic;
-}
-
-.message-list {
+.main {
   flex: 1;
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 20px;
-  padding: 16px;
-  overflow-y: auto;
-  border-radius: 14px;
-  background: #f8fafc;
+  min-height: 0;
 }
 
-.message {
-  max-width: 75%;
-  padding: 12px;
-  border-radius: 14px;
-  background: white;
-  border: 1px solid #e2e8f0;
-}
-
-.message.own {
-  align-self: flex-end;
-  background: #dbeafe;
-}
-
-.message-meta {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  font-size: 12px;
-  color: #64748b;
-}
-
-.message p {
-  margin: 8px 0 0;
-}
-
-.message-form {
-  display: flex;
-  gap: 12px;
-  margin-top: 18px;
-}
-
-.empty-text {
-  color: #94a3b8;
-}
-
-@media (max-width: 760px) {
-  .chat-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .chat-header {
-    align-items: stretch;
+@media (max-width: 720px) {
+  .main {
     flex-direction: column;
-  }
-
-  .chat-header select {
-    max-width: none;
   }
 }
 </style>

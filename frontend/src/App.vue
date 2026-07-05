@@ -104,6 +104,30 @@ async function connectUser() {
   }
 }
 
+
+async function disconnectUser() {
+  errorMessage.value = ''
+
+  if (!connection) {
+    return
+  }
+
+  try {
+    await connection.stop()
+  } catch (error) {
+    errorMessage.value = 'Could not disconnect cleanly.'
+    console.error(error)
+  } finally {
+    connection = null
+    connectionStatus.value = 'Disconnected'
+    onlineUsers.value = []
+    receiverId.value = ''
+    typingIndicator.value = ''
+  }
+}
+
+
+
 async function sendMessage() {
   errorMessage.value = ''
 
@@ -185,11 +209,20 @@ function formatTime(sentAt) {
             />
 
             <button
+              v-if="connectionStatus !== 'Connected'"
               type="button"
-              :disabled="connectionStatus === 'Connected'"
               @click="connectUser"
             >
               Connect
+            </button>
+
+            <button
+              v-else
+              type="button"
+              class="secondary-button"
+              @click="disconnectUser"
+            >
+              Disconnect
             </button>
           </div>
         </div>
@@ -355,6 +388,10 @@ input:disabled {
   cursor: not-allowed;
 }
 
+.secondary-button {
+  background: #475569;
+}
+
 .status {
   margin-top: 18px;
 }
@@ -481,15 +518,18 @@ input:disabled {
   .chat-header select {
     max-width: none;
   }
-}
-</style>
 
-.typing-indicator {
+  .typing-indicator {
   margin: 14px 0 0;
   color: #64748b;
   font-size: 14px;
   font-style: italic;
+  }
+
 }
+</style>
+
+
 
 
 

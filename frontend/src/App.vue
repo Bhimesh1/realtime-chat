@@ -9,7 +9,9 @@ const connectionStatus = ref('Disconnected')
 const onlineUsers = ref([])
 const messages = ref([])
 const errorMessage = ref('')
+const typingIndicator = ref('')
 
+let typingTimeout = null
 let connection = null
 
 const availableReceivers = computed(() =>
@@ -47,6 +49,18 @@ async function connectUser() {
 
     connection.on('ReceiveMessage', message => {
       messages.value = [...messages.value, message]
+    })
+
+    connection.on('ReceiveTyping', message => {
+      typingIndicator.value = `${message.senderId} is typing...`
+
+      if (typingTimeout) {
+        clearTimeout(typingTimeout)
+      }
+
+      typingTimeout = setTimeout(() => {
+        typingIndicator.value = ''
+      }, 1500)
     })
 
     connection.on('ReceiveError', error => {
@@ -119,6 +133,27 @@ async function sendMessage() {
     messageText.value = ''
   } catch (error) {
     errorMessage.value = 'Message could not be sent.'
+    console.error(error)
+  }
+}
+
+async function sendTyping() {
+  if (!connection || connectionStatus.value !== 'Connected') {
+    return
+  }
+
+  if (!receiverId.value.trim()) {
+    return
+  }
+
+  try {
+    await connection.invoke('SendTyping', {
+      type: 'typing',
+      senderId: userId.value.trim(),
+      receiverId: receiverId.value.trim(),
+      data: 'typing'
+    })
+  } catch (error) {
     console.error(error)
   }
 }
@@ -202,6 +237,10 @@ function formatTime(sentAt) {
           {{ errorMessage }}
         </p>
 
+        <p v-if="typingIndicator" class="typing-indicator">
+          {{ typingIndicator }}
+        </p>
+
         <div class="message-list">
           <p v-if="messages.length === 0" class="empty-text">
             No messages yet.
@@ -228,6 +267,7 @@ function formatTime(sentAt) {
             v-model="messageText"
             type="text"
             placeholder="Type your message"
+            @input="sendTyping"
           />
 
           <button type="submit">
@@ -444,7 +484,12 @@ input:disabled {
 }
 </style>
 
-
+.typing-indicator {
+  margin: 14px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  font-style: italic;
+}
 
 
 

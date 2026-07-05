@@ -34,6 +34,40 @@ public class MessageValidatorTests
     }
 
     [Fact]
+    public void Validate_ReturnsSuccess_WhenTypingStopMessageIsValid()
+    {
+        var message = new ChatMessage
+        {
+            Type = "typing",
+            SenderId = "user-1",
+            ReceiverId = "user-2",
+            Data = "stop"
+        };
+
+        var result = _validator.Validate(message);
+
+        Assert.True(result.IsValid);
+        Assert.Null(result.ErrorMessage);
+    }
+
+    [Fact]
+    public void Validate_ReturnsError_WhenTypingStatusIsInvalid()
+    {
+        var message = new ChatMessage
+        {
+            Type = "typing",
+            SenderId = "user-1",
+            ReceiverId = "user-2",
+            Data = "typing"
+        };
+
+        var result = _validator.Validate(message);
+
+        Assert.False(result.IsValid);
+        Assert.Equal("Typing status must be start or stop.", result.ErrorMessage);
+    }
+
+    [Fact]
     public void Validate_ReturnsError_WhenMessageTypeIsUnsupported()
     {
         var message = new ChatMessage
@@ -154,7 +188,8 @@ public class MessageValidatorTests
         {
             Type = "typing",
             SenderId = "user-1",
-            ReceiverId = "user-2"
+            ReceiverId = "user-2",
+            Data = "start"
         };
 
         var result = _validator.Validate(message);

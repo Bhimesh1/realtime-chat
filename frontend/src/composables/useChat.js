@@ -12,7 +12,8 @@ export function useChat() {
   const typingIndicator = ref('')
   const unreadByUser = ref({})
 
-  let typingTimeout = null
+  let incomingTypingTimeout = null
+  let outgoingTypingStopTimeout = null
   let connection = null
 
   const currentUserId = computed(() => userId.value.trim())
@@ -74,9 +75,52 @@ export function useChat() {
     return `${prefix}${message.data}`
   }
 
-  function selectReceiver(nextReceiverId) {
-    receiverId.value = nextReceiverId
+  function clearIncomingTypingIndicator() {
     typingIndicator.value = ''
+
+    if (incomingTypingTimeout) {
+      clearTimeout(incomingTypingTimeout)
+      incomingTypingTimeout = null
+    }
+  }
+
+  function clearOutgoingTypingTimer() {
+    if (outgoingTypingStopTimeout) {
+      clearTimeout(outgoingTypingStopTimeout)
+      outgoingTypingStopTimeout = null
+    }
+  }
+
+  async function sendTypingStatus(status) {
+    if (!connection || connectionStatus.value !== 'Connected') {
+      return
+    }
+
+    if (!receiverId.value.trim()) {
+      return
+    }
+
+    try {
+      await connection.invoke('SendTyping', {
+        type: 'typing',
+        senderId: currentUserId.value,
+        receiverId: receiverId.value.trim(),
+        data: status
+      })
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  function selectReceiver(nextReceiverId) {
+    if (receiverId.value && receiverId.value !== nextReceiverId) {
+      void sendTypingStatus('stop')
+    }
+
+    clearOutgoingTypingTimer()
+    clearIncomingTypingIndicator()
+
+    receiverId.value = nextReceiverId
 
     if (nextReceiverId) {
       unreadByUser.value = {
@@ -138,14 +182,20 @@ export function useChat() {
           return
         }
 
-        typingIndicator.value = `${message.senderId} is typing...`
-
-        if (typingTimeout) {
-          clearTimeout(typingTimeout)
+        if (message.data === 'stop') {
+          clearIncomingTypingIndicator()
+          return
         }
 
-        typingTimeout = setTimeout(() => {
+        typingIndicator.value = `${message.senderId} is typing...`
+
+        if (incomingTypingTimeout) {
+          clearTimeout(incomingTypingTimeout)
+        }
+
+        incomingTypingTimeout = setTimeout(() => {
           typingIndicator.value = ''
+          incomingTypingTimeout = null
         }, 1500)
       })
 
@@ -155,6 +205,8 @@ export function useChat() {
 
       connection.onreconnecting(() => {
         connectionStatus.value = 'Reconnecting'
+        clearOutgoingTypingTimer()
+        clearIncomingTypingIndicator()
       })
 
       connection.onreconnected(async () => {
@@ -171,6 +223,8 @@ export function useChat() {
       connection.onclose(() => {
         connectionStatus.value = 'Disconnected'
         onlineUsers.value = []
+        clearOutgoingTypingTimer()
+        clearIncomingTypingIndicator()
       })
 
       await connection.start()
@@ -198,6 +252,7 @@ export function useChat() {
     }
 
     try {
+      await sendTypingStatus('stop')
       await connection.stop()
     } catch (error) {
       errorMessage.value = 'Could not disconnect cleanly.'
@@ -206,6 +261,8 @@ export function useChat() {
       connection = null
       connectionStatus.value = 'Disconnected'
       onlineUsers.value = []
+      clearOutgoingTypingTimer()
+      clearIncomingTypingIndicator()
       selectReceiver('')
     }
   }
@@ -237,6 +294,8 @@ export function useChat() {
       })
 
       messageText.value = ''
+      clearOutgoingTypingTimer()
+      await sendTypingStatus('stop')
     } catch (error) {
       errorMessage.value = 'Message could not be sent.'
       console.error(error)
@@ -244,24 +303,20 @@ export function useChat() {
   }
 
   async function sendTyping() {
-    if (!connection || connectionStatus.value !== 'Connected') {
+    if (!messageText.value.trim()) {
+      clearOutgoingTypingTimer()
+      await sendTypingStatus('stop')
       return
     }
 
-    if (!receiverId.value.trim()) {
-      return
-    }
+    await sendTypingStatus('start')
 
-    try {
-      await connection.invoke('SendTyping', {
-        type: 'typing',
-        senderId: currentUserId.value,
-        receiverId: receiverId.value.trim(),
-        data: 'typing'
-      })
-    } catch (error) {
-      console.error(error)
-    }
+    clearOutgoingTypingTimer()
+
+    outgoingTypingStopTimeout = setTimeout(() => {
+      void sendTypingStatus('stop')
+      outgoingTypingStopTimeout = null
+    }, 1200)
   }
 
   return {

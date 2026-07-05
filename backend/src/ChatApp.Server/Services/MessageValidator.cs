@@ -58,6 +58,12 @@ public class MessageValidator
             {
                 return ValidationResult.Fail("Receiver id is required for typing messages.");
             }
+
+            if (!message.Data.Equals("start", StringComparison.OrdinalIgnoreCase) &&
+                !message.Data.Equals("stop", StringComparison.OrdinalIgnoreCase))
+            {
+                return ValidationResult.Fail("Typing status must be start or stop.");
+            }
         }
 
         return ValidationResult.Success();

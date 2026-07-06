@@ -56,7 +56,7 @@ function getInitial(userId) {
         type="button"
         class="user"
         :class="{ active: conversation.userId === selectedReceiverId }"
-        @click="emit('select-user', conversation.userId)"
+        @click="emit('select-user', conversation.userId === selectedReceiverId ? '' : conversation.userId)"
       >
         <span
           class="avatar"
@@ -148,7 +148,12 @@ function getInitial(userId) {
   background: none;
   cursor: pointer;
   text-align: left;
-  transition: background 0.12s;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background 0.12s,
+    box-shadow 0.12s,
+    transform 0.08s;
 }
 
 .user:hover {
@@ -157,6 +162,20 @@ function getInitial(userId) {
 
 .user.active {
   background: var(--accent-soft);
+}
+
+.user:focus {
+  outline: none;
+}
+
+.user:focus-visible {
+  border-radius: 10px;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.user:active {
+  border-radius: 10px;
+  transform: scale(0.99);
 }
 
 .avatar {
@@ -250,9 +269,70 @@ function getInitial(userId) {
 @media (max-width: 720px) {
   .sidebar {
     width: 100%;
-    max-height: 320px;
+    height: 100%;
+    max-height: none;
     border-right: none;
-    border-bottom: 1px solid var(--border);
+    border-bottom: none;
+  }
+
+  .user:focus-visible {
+    border-radius: 12px;
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+
+  .user:active {
+    border-radius: 12px;
+  }
+
+  .me {
+    flex-shrink: 0;
+    padding: 14px 16px;
+  }
+
+  .section-label {
+    flex-shrink: 0;
+    padding: 14px 16px 8px;
+  }
+
+  .list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    overflow-y: auto;
+    padding: 6px 12px 16px;
+  }
+
+  .user {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    flex: 0 0 auto;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    background: var(--bg-elevated);
+  }
+
+  .user:hover,
+  .user.active {
+    background: var(--bg-hover);
+  }
+
+  .user.active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .meta {
+    min-width: 0;
+  }
+
+  .dot,
+  .unread {
+    margin-left: auto;
   }
 }
+
+
 </style>

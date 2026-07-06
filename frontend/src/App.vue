@@ -41,7 +41,7 @@ const {
       {{ errorMessage }}
     </div>
 
-    <div class="main">
+    <div class="main" :class="{ 'has-selected-chat': receiverId }">
       <UserSidebar
         :user-id="userId"
         :conversations="conversationPreviews"
@@ -95,6 +95,20 @@ const {
   flex: 1;
   display: flex;
   min-height: 0;
+}
+
+@media (max-width: 720px) {
+  .main {
+    position: relative;
+  }
+
+  .main:not(.has-selected-chat) :deep(.chat) {
+    display: none;
+  }
+
+  .main.has-selected-chat :deep(.sidebar) {
+    display: none;
+  }
 }
 
 @media (max-width: 720px) {

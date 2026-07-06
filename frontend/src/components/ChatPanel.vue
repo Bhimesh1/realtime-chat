@@ -64,6 +64,10 @@ function formatTime(sentAt) {
   })
 }
 
+function getInitial(userId) {
+  return userId.trim().charAt(0).toUpperCase()
+}
+
 function isReceiverOnline() {
   return props.availableReceivers.includes(props.receiverId)
 }
@@ -73,16 +77,30 @@ function isReceiverOnline() {
   <section class="chat">
     <template v-if="receiverId">
       <header>
-        <div>
-          <div class="peer-name">
-            {{ receiverId }}
-          </div>
+        <button
+          type="button"
+          class="back-button"
+          @click="emit('select-receiver', '')"
+        >
+          Back
+        </button>
 
-          <div
-            class="peer-status"
-            :class="isReceiverOnline() ? 'online' : 'offline'"
-          >
-            {{ isReceiverOnline() ? 'online' : 'offline' }}
+        <div class="peer-info">
+          <span class="peer-avatar">
+            {{ getInitial(receiverId) }}
+          </span>
+
+          <div class="peer-text">
+            <div class="peer-name">
+              {{ receiverId }}
+            </div>
+
+            <div
+              class="peer-status"
+              :class="isReceiverOnline() ? 'online' : 'offline'"
+            >
+              {{ isReceiverOnline() ? 'online' : 'offline' }}
+            </div>
           </div>
         </div>
       </header>
@@ -162,6 +180,9 @@ function isReceiverOnline() {
 }
 
 header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 14px 20px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-panel);
@@ -182,6 +203,29 @@ header {
 
 .peer-status.offline {
   color: var(--text-dim);
+}
+
+.peer-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.peer-avatar {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--bubble-mine);
+  color: #fff;
+  font-weight: 600;
+}
+
+.peer-text {
+  min-width: 0;
 }
 
 .messages {
@@ -326,13 +370,72 @@ button:disabled {
   font-size: 42px;
 }
 
-@media (max-width: 560px) {
-  form {
-    flex-direction: column;
+.back-button {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  footer {
+    padding: 10px 12px;
   }
 
-  .bubble {
-    max-width: 82%;
+  form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 72px;
+    gap: 8px;
+    align-items: center;
+  }
+
+  input {
+    width: 100%;
+    min-width: 0;
+    height: 42px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  button {
+    height: 42px;
+    padding: 0;
+    font-size: 13px;
   }
 }
+
+@media (max-width: 390px) {
+  form {
+    grid-template-columns: minmax(0, 1fr) 66px;
+  }
+
+  button {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 720px) {
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  
+
+  .back-button {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-elevated);
+    color: var(--text-dim);
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .back-button:hover {
+    color: var(--text);
+  }
+}
+
+
 </style>

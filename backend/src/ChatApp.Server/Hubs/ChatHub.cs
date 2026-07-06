@@ -14,10 +14,10 @@ public class ChatHub : Hub
     private readonly MessageStore _messageStore;
 
     public ChatHub(MessageValidator messageValidator, MessageStore messageStore)
-{
-    _messageValidator = messageValidator;
-    _messageStore = messageStore;
-}
+    {
+        _messageValidator = messageValidator;
+        _messageStore = messageStore;
+    }
 
     public async Task RegisterUser(ChatMessage message)
     {
@@ -46,7 +46,7 @@ public class ChatHub : Hub
         RemoveExistingUserForCurrentConnection();
 
         ConnectedUsers[senderId] = Context.ConnectionId;
-        
+
         await Clients.All.SendAsync("UserPresenceChanged", senderId, true);
         await Clients.Caller.SendAsync("OnlineUsers", ConnectedUsers.Keys.Order().ToList());
     }

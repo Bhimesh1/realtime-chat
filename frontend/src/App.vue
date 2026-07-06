@@ -34,7 +34,7 @@ const {
 
   <main v-else class="layout">
     <div v-if="connectionStatus === 'Reconnecting'" class="banner reconnecting">
-      Connection lost — reconnecting…
+      Connection lost, reconnecting…
     </div>
 
     <div v-if="errorMessage" class="banner error">

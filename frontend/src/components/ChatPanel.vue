@@ -107,7 +107,8 @@ function isReceiverOnline() {
 
       <div ref="scroller" class="messages">
         <p v-if="messages.length === 0" class="empty">
-          No messages yet - say hi to {{ receiverId }} 👋
+          No messages yet <br />
+          say hii to {{ receiverId }}👋
         </p>
 
         <div

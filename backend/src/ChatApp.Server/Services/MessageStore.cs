@@ -2,6 +2,10 @@ using ChatApp.Server.Models;
 
 namespace ChatApp.Server.Services;
 
+/// <summary>
+/// Stores recent messages in memory by conversation pair.
+/// History is capped and cleared on server restart because this challenge does not use a database.
+/// </summary>
 public class MessageStore
 {
     private const int MaxMessagesPerConversation = 100;

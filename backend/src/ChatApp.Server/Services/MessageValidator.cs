@@ -2,6 +2,10 @@ using ChatApp.Server.Models;
 
 namespace ChatApp.Server.Services;
 
+/// <summary>
+/// Validates client message envelopes before the hub processes them.
+/// Kept separate from the SignalR hub so validation rules are easy to test.
+/// </summary>
 public class MessageValidator
 {
     private const int MaxUserIdLength = 64;
@@ -77,8 +81,8 @@ public class MessageValidator
                 return ValidationResult.Fail("Sender and receiver cannot be the same user.");
             }
 
-            if (!message.Data.Equals("start", StringComparison.OrdinalIgnoreCase) &&
-                !message.Data.Equals("stop", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(message.Data, "start", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(message.Data, "stop", StringComparison.OrdinalIgnoreCase))
             {
                 return ValidationResult.Fail("Typing status must be start or stop.");
             }

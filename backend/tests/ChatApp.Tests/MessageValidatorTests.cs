@@ -118,6 +118,23 @@ public class MessageValidatorTests
     }
 
     [Fact]
+    public void Validate_ReturnsError_WhenTypingStatusIsNull()
+    {
+        var message = new ChatMessage
+        {
+            Type = "typing",
+            SenderId = "user-1",
+            ReceiverId = "user-2",
+            Data = null!
+        };
+
+        var result = _validator.Validate(message);
+
+        Assert.False(result.IsValid);
+        Assert.Equal("Typing status must be start or stop.", result.ErrorMessage);
+    }
+
+    [Fact]
     public void Validate_ReturnsError_WhenChatReceiverIdIsMissing()
     {
         var message = new ChatMessage

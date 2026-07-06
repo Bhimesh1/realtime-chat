@@ -5,8 +5,14 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace ChatApp.Server.Hubs;
 
+/// <summary>
+/// Handles SignalR events for user registration, direct messages, typing updates, and presence.
+/// Invalid client input is returned to the caller as an error message instead of crashing the hub.
+/// </summary>
 public class ChatHub : Hub
 {
+
+    // Tracks the active SignalR connection for each username in this in-memory challenge version.
     private static readonly ConcurrentDictionary<string, string> ConnectedUsers = new(
         StringComparer.OrdinalIgnoreCase);
 
@@ -67,15 +73,20 @@ public class ChatHub : Hub
             return;
         }
 
-        if (!IsRegisteredSender(message.SenderId))
+        var senderId = message.SenderId.Trim();
+        var receiverId = message.ReceiverId.Trim();
+
+        if (!IsRegisteredSender(senderId))
         {
             await SendError("Sender is not registered on this connection.");
             return;
         }
 
+        message.SenderId = senderId;
+        message.ReceiverId = receiverId;
         message.SentAt = DateTime.UtcNow;
 
-        if (!ConnectedUsers.TryGetValue(message.ReceiverId, out var receiverConnectionId))
+        if (!ConnectedUsers.TryGetValue(receiverId, out var receiverConnectionId))
         {
             await SendError("Receiver is currently offline.");
             return;
@@ -127,13 +138,19 @@ public class ChatHub : Hub
             return;
         }
 
-        if (!IsRegisteredSender(message.SenderId))
+        var senderId = message.SenderId.Trim();
+        var receiverId = message.ReceiverId.Trim();
+
+        if (!IsRegisteredSender(senderId))
         {
             await SendError("Sender is not registered on this connection.");
             return;
         }
 
-        if (ConnectedUsers.TryGetValue(message.ReceiverId, out var receiverConnectionId))
+        message.SenderId = senderId;
+        message.ReceiverId = receiverId;
+
+        if (ConnectedUsers.TryGetValue(receiverId, out var receiverConnectionId))
         {
             await Clients.Client(receiverConnectionId).SendAsync("ReceiveTyping", message);
         }

@@ -34,6 +34,72 @@ public class ChatHubTests
         Assert.Equal("Message cannot be empty.", error.Data);
     }
 
+    [Fact]
+    public async Task SendMessage_SendsError_WhenSenderIsNotRegistered()
+    {
+        var caller = new RecordingClientProxy();
+
+        var hub = new ChatHub(new MessageValidator(), new MessageStore())
+        {
+            Context = new TestHubCallerContext("connection-1"),
+            Clients = new TestHubCallerClients(caller)
+        };
+
+        await hub.SendMessage(new ChatMessage
+        {
+            Type = "chat",
+            SenderId = "user-1",
+            ReceiverId = "user-2",
+            Data = "Hello"
+        });
+
+        var call = Assert.Single(caller.Calls);
+
+        Assert.Equal("ReceiveError", call.Method);
+
+        var error = Assert.IsType<ChatMessage>(Assert.Single(call.Arguments));
+
+        Assert.Equal("error", error.Type);
+        Assert.Equal("Sender is not registered on this connection.", error.Data);
+    }
+
+    [Fact]
+    public async Task SendMessage_SendsError_WhenReceiverIsOffline()
+    {
+        var caller = new RecordingClientProxy();
+
+        var hub = new ChatHub(new MessageValidator(), new MessageStore())
+        {
+            Context = new TestHubCallerContext("connection-2"),
+            Clients = new TestHubCallerClients(caller)
+        };
+
+        await hub.RegisterUser(new ChatMessage
+        {
+            Type = "connect",
+            SenderId = "offline-test-sender"
+        });
+
+        caller.Calls.Clear();
+
+        await hub.SendMessage(new ChatMessage
+        {
+            Type = "chat",
+            SenderId = "offline-test-sender",
+            ReceiverId = "offline-test-receiver",
+            Data = "Hello"
+        });
+
+        var call = Assert.Single(caller.Calls);
+
+        Assert.Equal("ReceiveError", call.Method);
+
+        var error = Assert.IsType<ChatMessage>(Assert.Single(call.Arguments));
+
+        Assert.Equal("error", error.Type);
+        Assert.Equal("Receiver is currently offline.", error.Data);
+    }
+
     private sealed class RecordingClientProxy : IClientProxy
     {
         public List<(string Method, object?[] Arguments)> Calls { get; } = new();

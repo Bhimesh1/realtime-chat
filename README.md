@@ -1,115 +1,133 @@
 # Real-Time Chat App
 
-A simple full-stack real-time chat application built with ASP.NET Core, SignalR, and Vue 3.
+A simple full-stack chat application where two users can exchange messages in real time.
 
-The app allows two connected users to exchange messages instantly, see online users, view typing indicators, and continue conversations using in-memory message history.
+The project was built with ASP.NET Core, SignalR, and Vue 3. It supports direct messages, online presence, typing indicators, server-side message validation, and basic in-memory conversation history.
+
+## Features
+
+* Join the chat with a simple username
+* See online users
+* Send and receive messages instantly
+* Show typing indicators
+* Handle disconnects without crashing the server
+* Validate incoming messages on the server
+* Return safe error messages for invalid input
+* Keep recent messages in memory during the same server run
 
 ## Tech Stack
 
-### Backend
+**Backend**
 
 * ASP.NET Core
 * C#
 * SignalR
-* xUnit for backend tests
+* xUnit
 
-### Frontend
+**Frontend**
 
 * Vue 3
 * Vite
 * JavaScript
 * SignalR JavaScript client
 
-### Development / Local Running
+**Containerized setup**
 
 * Docker
 * Docker Compose
+* Nginx for serving the built frontend in Docker
 
-## Features
+## Run Locally
 
-* Connect as a user with a simple user id
-* See online users in the sidebar
-* Send and receive real-time messages
-* Show typing indicators
-* Track typing start and stop states
-* Show conversation previews
-* Show unread message counts
-* Store recent messages in memory on the server
-* Load message history when selecting a conversation
-* Handle disconnects without crashing the server
-* Validate incoming message format safely
-* Reject invalid messages with server-side error responses
-* Run the full app locally with Docker Compose
+### Backend
 
-## Prerequisites
+From the project root:
 
-For normal local development:
-
-* .NET 10 SDK
-* Node.js 22 or newer
-* npm
-
-For Docker-based running:
-
-* Docker
-* Docker Compose
-
-The backend and frontend should be started in separate terminal windows when running without Docker.
-
-## Project Structure
-
-```text
-realtime-chat/
-├── backend/
-│   ├── .dockerignore
-│   ├── Dockerfile
-│   ├── ChatApp.slnx
-│   ├── src/
-│   │   └── ChatApp.Server/
-│   │       ├── Hubs/
-│   │       │   └── ChatHub.cs
-│   │       ├── Models/
-│   │       │   └── ChatMessage.cs
-│   │       ├── Services/
-│   │       │   ├── MessageStore.cs
-│   │       │   └── MessageValidator.cs
-│   │       ├── Properties/
-│   │       │   └── launchSettings.json
-│   │       ├── ChatApp.Server.csproj
-│   │       └── Program.cs
-│   └── tests/
-│       └── ChatApp.Tests/
-│           ├── ChatHubTests.cs
-│           ├── MessageValidatorTests.cs
-│           └── ChatApp.Tests.csproj
-│
-├── frontend/
-│   ├── .dockerignore
-│   ├── Dockerfile
-│   ├── nginx.conf
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── ChatPanel.vue
-│   │   │   ├── LoginPanel.vue
-│   │   │   └── UserSidebar.vue
-│   │   ├── composables/
-│   │   │   └── useChat.js
-│   │   ├── services/
-│   │   │   └── chatConnection.js
-│   │   ├── App.vue
-│   │   └── main.js
-│   ├── package.json
-│   └── package-lock.json
-│
-├── docker-compose.yml
-└── README.md
 ```
+cd backend
+dotnet restore
+dotnet run --project src/ChatApp.Server
+```
+
+The backend runs at:
+
+```
+http://localhost:5046
+```
+
+The SignalR hub is available at:
+
+```
+http://localhost:5046/chatHub
+```
+
+### Frontend
+
+Open a second terminal from the project root:
+
+```
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend runs at:
+
+```
+http://localhost:5173
+```
+
+Open the app in two browser tabs and join with two different usernames to test the chat flow.
+
+## Run with Docker
+
+From the project root:
+
+```
+docker compose up --build -d
+```
+
+Then open:
+
+```
+http://localhost:5173
+```
+
+Docker exposes:
+
+```
+frontend: http://localhost:5173
+backend:  http://localhost:5046
+hub:      http://localhost:5046/chatHub
+```
+
+To stop the containers:
+
+```
+docker compose down
+```
+
+## Frontend Configuration
+
+The frontend reads the SignalR hub URL from:
+
+```
+VITE_CHAT_HUB_URL
+```
+
+Example:
+
+```
+VITE_CHAT_HUB_URL=http://localhost:5046/chatHub
+```
+
+If the variable is not provided, the frontend falls back to the local backend URL.
 
 ## Message Format
 
-Clients send chat-related messages with this base structure:
+The app uses a simple message envelope for communication between the client and server.
 
-```json
+```
 {
   "type": "chat",
   "senderId": "user-1",
@@ -118,239 +136,54 @@ Clients send chat-related messages with this base structure:
 }
 ```
 
-The server adds `sentAt` when it accepts and forwards a chat message:
+The `type` field describes what kind of event the message represents:
 
-```json
-{
-  "type": "chat",
-  "senderId": "user-1",
-  "receiverId": "user-2",
-  "data": "Hello",
-  "sentAt": "2026-07-05T12:00:00Z"
-}
-```
+| Type      | Direction       | Purpose                                            |
+| --------- | --------------- | -------------------------------------------------- |
+| `connect` | Client → Server | Register a user with the SignalR hub               |
+| `chat`    | Client → Server | Send a plain text message to another user          |
+| `typing`  | Client → Server | Notify another user that typing started or stopped |
+| `error`   | Server → Client | Return a validation or connection error safely     |
 
-`sentAt` is generated by the server for display and in-memory message history. Clients only need to send `type`, `senderId`, `receiverId`, and `data`.
 
-## Message Types
 
-| Type      | Purpose                                              |
-| --------- | ---------------------------------------------------- |
-| `connect` | Registers a user connection with the SignalR hub     |
-| `chat`    | Sends a plain text message to another connected user |
-| `typing`  | Sends typing status updates                          |
-| `error`   | Sent by the server when a client message is invalid  |
+When the server accepts a chat message, it adds `sentAt` before sending the message to the sender and receiver.
 
-Clients can send:
-
-```text
-connect
-chat
-typing
-```
-
-The server sends:
-
-```text
-error
-```
-
-when validation fails.
-
-## Typing Message Format
-
-Typing messages use the same base structure.
-
-```json
-{
-  "type": "typing",
-  "senderId": "user-1",
-  "receiverId": "user-2",
-  "data": "start"
-}
-```
-
-Valid typing values are:
-
-```text
-start
-stop
-```
 
 ## Real-Time Flow
 
-```text
-User opens frontend
+```
+User joins with a username
         ↓
-User enters user id
+Vue creates a SignalR connection
         ↓
-Vue creates SignalR connection
+Client registers the username
         ↓
-Client calls RegisterUser
+Server stores the connection and broadcasts presence
         ↓
-Server stores connection id for the user
+Users select another online user
         ↓
-Server broadcasts presence update
+Messages and typing updates are sent through SignalR
         ↓
-Another user connects
+Server validates each message before forwarding it
         ↓
-Users select each other and send chat messages
-        ↓
-Server validates each message
-        ↓
-Server stores the message in memory
-        ↓
-Server sends the message to sender and receiver
+Invalid messages return an error response to the caller
 ```
 
-## Validation Rules
-
-The backend validates incoming messages before processing them.
-
-Current validation includes:
-
-* Message cannot be empty
-* Message type is required
-* Only client-supported message types are accepted
-* Sender id is required
-* Sender id cannot be longer than 64 characters
-* Receiver id is required for chat and typing messages
-* Receiver id cannot be longer than 64 characters
-* Sender and receiver cannot be the same user
-* Chat message text is required
-* Chat message text cannot be longer than 2000 characters
-* Typing status must be `start` or `stop`
-* Invalid messages return an error response instead of crashing the server
-
-## Running the App with Docker
+## Run Tests
 
 From the project root:
 
-```bash
-docker compose up --build -d
 ```
-
-Then open:
-
-```text
-http://localhost:5173
-```
-
-The Docker setup uses these host ports:
-
-```text
-frontend: http://localhost:5173
-backend:  http://localhost:5046
-hub:      http://localhost:5046/chatHub
-```
-
-To stop the containers:
-
-```bash
-docker compose down
-```
-
-## Running the Backend Without Docker
-
-From the project root:
-
-```bash
-cd backend
-dotnet restore
-dotnet run --project src/ChatApp.Server
-```
-
-The backend should run at:
-
-```text
-http://localhost:5046
-```
-
-The SignalR hub is available at:
-
-```text
-http://localhost:5046/chatHub
-```
-
-## Running the Frontend Without Docker
-
-From the project root in a separate terminal:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The frontend usually runs at:
-
-```text
-http://localhost:5173
-```
-
-## Frontend Environment Variable
-
-The frontend reads the SignalR hub URL from:
-
-```text
-VITE_CHAT_HUB_URL
-```
-
-Example:
-
-```env
-VITE_CHAT_HUB_URL=http://localhost:5046/chatHub
-```
-
-If the variable is not provided, the frontend uses the default local hub URL.
-
-## Running Tests
-
-From the project root:
-
-```bash
 cd backend
 dotnet test
 ```
 
-The tests cover message validation and include a hub-level safety test to ensure invalid messages are rejected with an error response instead of crashing the server.
-
-## Current Limitations
-
-This project intentionally keeps the scope simple for a junior full-stack challenge.
-
-Current limitations:
-
-* No real authentication
-* No database persistence
-* Message history is stored in memory only
-* Refreshing the server clears all message history
-* Users are identified by simple user ids
-* No group chats
-* No file uploads
-* No message delete or edit support
-
 ## What I Would Improve Next
-
-With more time, I would add:
 
 * Database persistence for users and messages
 * Authentication and authorization
-* Message delivery and read receipts
+* Read receipts and delivery status
 * Group chat support
-* End-to-end integration tests for SignalR hub behavior
-* Deployment configuration for production hosting
-
-## Design Notes
-
-The UI keeps a simple two-panel chat layout:
-
-```text
-Sidebar       Chat panel
-users         selected conversation
-presence      messages
-previews      input
-unread count  typing indicator
-```
-
-The project keeps the implementation simple while covering the required real-time messaging, presence, typing, validation, testing, and documentation requirements.
+* More complete SignalR integration tests
+* Production deployment configuration
